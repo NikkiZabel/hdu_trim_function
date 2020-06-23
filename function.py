@@ -5,12 +5,12 @@ from astropy.coordinates import SkyCoord
 from astropy.io import fits
 
 
-def make_square(hdu):
+def make_square(hdu, pad_value=0):
 
     hdu_square = hdu.copy()
 
     shape_diff = np.max(hdu_square.shape) - np.min(hdu_square.shape)
-    square_img = np.ones((np.max(hdu_square.shape), np.max(hdu_square.shape))) * np.nan
+    square_img = np.ones((np.max(hdu_square.shape), np.max(hdu_square.shape))) * pad_value
 
     new_header = hdu_square.header.copy()
 
@@ -106,7 +106,7 @@ def cut_empty_columns(hdu, parallel_hdu=None, pad=0):
         return hdu_trimmed
 
 
-def centre_data(hdu, centre, frame='sky', parallel_hdu=None):
+def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
     
     hdu_centred = hdu.copy()
     parallel_hdu_centred = parallel_hdu.copy()
@@ -127,16 +127,16 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None):
 
     # Pad the image with twice the amount it has to shift, so that the new centre overlaps with the coordinates
     if shift_x > 0:
-        temp = np.zeros((hdu_centred.shape[0] + shift_x * 2, hdu_centred.shape[1]))
+        temp = np.ones((hdu_centred.shape[0] + shift_x * 2, hdu_centred.shape[1])) * pad_value
         temp[0:hdu_centred.shape[0], :] = hdu_centred.data
         if parallel_hdu:
-            temp_parallel = np.zeros((parallel_hdu_centred.shape[0] + shift_x * 2, parallel_hdu_centred.shape[1]))
+            temp_parallel = np.ones((parallel_hdu_centred.shape[0] + shift_x * 2, parallel_hdu_centred.shape[1])) * pad_value
             temp_parallel[0:parallel_hdu_centred.shape[0], :] = parallel_hdu_centred.data
     elif shift_x < 0:
-        temp = np.zeros((hdu_centred.shape[0] + abs(shift_x) * 2, hdu_centred.shape[1]))
+        temp = np.ones((hdu_centred.shape[0] + abs(shift_x) * 2, hdu_centred.shape[1])) * pad_value
         temp[temp.shape[0] - hdu_centred.shape[0]:temp.shape[0], :] = hdu_centred.data
         if parallel_hdu:
-            temp_parallel = np.zeros((parallel_hdu_centred.shape[0] + abs(shift_x) * 2, parallel_hdu_centred.shape[1]))
+            temp_parallel = np.ones((parallel_hdu_centred.shape[0] + abs(shift_x) * 2, parallel_hdu_centred.shape[1])) * pad_value
             temp_parallel[temp_parallel.shape[0] - parallel_hdu_centred.shape[0]:temp_parallel.shape[0], :] = parallel_hdu_centred.data
     else:
         temp = hdu_centred.data
@@ -145,16 +145,16 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None):
 
     # Same in the y-direction
     if shift_y > 0:
-        hdu_new = np.zeros((temp.shape[0], temp.shape[1] + shift_y * 2))
+        hdu_new = np.ones((temp.shape[0], temp.shape[1] + shift_y * 2)) * pad_value
         hdu_new[:, 0:temp.shape[1]] = temp
         if parallel_hdu:
-            parallelhdu_new = np.zeros((temp_parallel.shape[0], temp_parallel.shape[1] + shift_y * 2))
+            parallelhdu_new = np.ones((temp_parallel.shape[0], temp_parallel.shape[1] + shift_y * 2)) * pad_value
             parallelhdu_new[:, 0:temp_parallel.shape[1]] = temp_parallel
     elif shift_y < 0:
-        hdu_new = np.zeros((temp.shape[0], temp.shape[1] + abs(shift_y) * 2))
+        hdu_new = np.ones((temp.shape[0], temp.shape[1] + abs(shift_y) * 2)) * pad_value
         hdu_new[:, hdu_new.shape[1] - temp.shape[1]:hdu_new.shape[1]] = temp
         if parallel_hdu:
-            parallelhdu_new = np.zeros((temp_parallel.shape[0], temp_parallel.shape[1] + abs(shift_y) * 2))
+            parallelhdu_new = np.ones((temp_parallel.shape[0], temp_parallel.shape[1] + abs(shift_y) * 2)) * pad_value
             parallelhdu_new[:, parallelhdu_new.shape[1] - temp_parallel.shape[1]:parallelhdu_new.shape[1]] = temp_parallel
     else:
         hdu_new = temp
@@ -182,23 +182,23 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None):
         return hdu_hdu
 
 
-def trim_image(hdu, parallel_hdu=None, pad=0, centre=None, centre_frame='sky', square=False):
+def trim_image(hdu, parallel_hdu=None, pad=0, centre=None, centre_frame='sky', square=False, pad_value=0):
 
     if parallel_hdu:
         hdu, parallel_hdu = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, pad=pad)
         hdu, parallel_hdu = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, pad=pad)
         if centre:
-            hdu, parallel_hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame)
+            hdu, parallel_hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame, pad_value=pad_value)
         if square:
-            hdu = make_square(hdu=hdu)
-            parallel_hdu = make_square(parallel_hdu)
+            hdu = make_square(hdu=hdu, pad_value=pad_value)
+            parallel_hdu = make_square(parallel_hdu, pad_value=pad_value)
         return hdu, parallel_hdu
     else:
         hdu = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, pad=pad)
         hdu = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, pad=pad)
         if centre:
-            hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame)
+            hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame, pad_value=pad_value)
         if square:
-            hdu = make_square(hdu=hdu)
+            hdu = make_square(hdu=hdu, pad_value=pad_value)
         return hdu
 
