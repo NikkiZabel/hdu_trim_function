@@ -24,13 +24,14 @@ def make_square(hdu, pad_value=0):
     return fits.PrimaryHDU(square_img, new_header)
 
 
-def cut_empty_rows(hdu, parallel_hdu=None, pad=0):
+def cut_empty_rows(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky'):
 
     hdu_trimmed = hdu.copy()
-    parallel_hdu_trimmed = parallel_hdu.copy()
+    if parallel_hdu:
+        parallel_hdu_trimmed = parallel_hdu.copy()
 
     # Find empty rows
-    empty_x = np.all(hdu_trimmed.data == 0)
+    empty_x = np.all(hdu_trimmed.data == empty_value, axis=1)
 
     # If the number of empty rows is larger than the desired padding, cut away rows and leave padding.
     if np.sum(empty_x) > pad:
@@ -54,24 +55,29 @@ def cut_empty_rows(hdu, parallel_hdu=None, pad=0):
         pix_shift = [i for i, x in enumerate(empty_x) if not x][1] - 1
         if empty_x[0]:
             hdu_trimmed.header['CRPIX2'] -= pix_shift
+            if parallel_hdu:
+                parallel_hdu_trimmed.header['CRPIX2'] -= pix_shift
+            if np.any(centre) and centre_frame == 'image':
+                centre[0] -= pix_shift
+
         hdu_trimmed.header['NAXIS2'] = hdu.shape[0]
         if parallel_hdu:
-            parallel_hdu_trimmed.header['CRPIX2'] -= pix_shift
             parallel_hdu_trimmed.header['NAXIS2'] = parallel_hdu_trimmed.shape[0]
 
     if parallel_hdu:
-        return hdu_trimmed, parallel_hdu_trimmed
+        return hdu_trimmed, parallel_hdu_trimmed, centre
     else:
-        return hdu_trimmed
+        return hdu_trimmed, centre
 
 
-def cut_empty_columns(hdu, parallel_hdu=None, pad=0):
+def cut_empty_columns(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky'):
 
     hdu_trimmed = hdu.copy()
-    parallel_hdu_trimmed = parallel_hdu.copy()
+    if parallel_hdu:
+        parallel_hdu_trimmed = parallel_hdu.copy()
 
     # Find empty columns
-    empty_y = np.all(hdu_trimmed.data == 0)
+    empty_y = np.all(hdu_trimmed.data == empty_value, axis=0)
 
     # If the number of empty columns is larger than the beamsize, cut away rows and leave as many as the beam size
     if np.sum(empty_y) > pad:
@@ -95,35 +101,40 @@ def cut_empty_columns(hdu, parallel_hdu=None, pad=0):
         pix_shift = [i for i, x in enumerate(empty_y) if not x][1] - 1
         if empty_y[0]:
             hdu_trimmed.header['CRPIX1'] -= pix_shift
+            if parallel_hdu:
+                parallel_hdu_trimmed.header['CRPIX1'] -= pix_shift
+            if np.any(centre) and centre_frame == 'image':
+                centre[1] -= pix_shift
+
         hdu_trimmed.header['NAXIS1'] = hdu_trimmed.shape[1]
         if parallel_hdu:
-            parallel_hdu_trimmed.header['CRPIX1'] -= pix_shift
             parallel_hdu_trimmed.header['NAXIS1'] = parallel_hdu_trimmed.shape[1]
 
     if parallel_hdu:
-        return hdu_trimmed, parallel_hdu_trimmed
+        return hdu_trimmed, parallel_hdu_trimmed, centre
     else:
-        return hdu_trimmed
+        return hdu_trimmed, centre
 
 
 def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
     
     hdu_centred = hdu.copy()
-    parallel_hdu_centred = parallel_hdu.copy()
+    if parallel_hdu:
+        parallel_hdu_centred = parallel_hdu.copy()
 
     # If frame == 'sky', find central pixel
     if frame == 'sky':
         w = wcs.WCS(hdu_centred.header, naxis=2)
         centre_sky = SkyCoord(centre[0], centre[1], unit=(u.deg, u.deg))
         centre_pix = wcs.utils.skycoord_to_pixel(centre_sky, w)
-    elif frame == 'pixel':
-        centre_pix = centre
+    elif frame == 'image':
+        centre_pix = np.flip(centre)
     else:
-        raise AttributeError('Please choose between "sky" and "pixel" for the keyword "frame".')
+        raise AttributeError('Please choose between "sky" and "image" for the keyword "frame".')
 
     # The amount the centre needs to shift to overlap with the central coordinates
-    shift_x = int(np.round(centre_pix[1] - hdu_centred.shape[1] / 2))
-    shift_y = int(np.round(centre_pix[0] - hdu_centred.shape[2] / 2))
+    shift_x = int(np.round(centre_pix[1] - hdu_centred.shape[0] / 2))
+    shift_y = int(np.round(centre_pix[0] - hdu_centred.shape[1] / 2))
 
     # Pad the image with twice the amount it has to shift, so that the new centre overlaps with the coordinates
     if shift_x > 0:
@@ -172,8 +183,8 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
 
     hdu_hdu = fits.PrimaryHDU(hdu_new, new_header)
 
-    parallelhdu_hdu = fits.PrimaryHDU(parallelhdu_new, new_header)
     if parallel_hdu:
+        parallelhdu_hdu = fits.PrimaryHDU(parallelhdu_new, new_header)
         parallelhdu_hdu.header['NAXIS3'] = parallel_hdu_centred.header['NAXIS3']
 
     if parallel_hdu:
@@ -182,23 +193,40 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
         return hdu_hdu
 
 
-def trim_image(hdu, parallel_hdu=None, pad=0, centre=None, centre_frame='sky', square=False, pad_value=0):
+def trim_image(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky', square=False, pad_value=0):
+
+    from matplotlib import pyplot as plt
+    import aplpy as apl
 
     if parallel_hdu:
-        hdu, parallel_hdu = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, pad=pad)
-        hdu, parallel_hdu = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, pad=pad)
-        if centre:
-            hdu, parallel_hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame, pad_value=pad_value)
+        hdu, parallel_hdu, centre = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
+                                                   centre=np.array(centre), centre_frame=centre_frame)
+        hdu, parallel_hdu, centre = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
+                                                      centre=np.array(centre), centre_frame=centre_frame)
+        if np.any(centre):
+            hdu, parallel_hdu = centre_data(hdu=hdu, centre=centre, frame=centre_frame, parallel_hdu=parallel_hdu, pad_value=pad_value)
         if square:
             hdu = make_square(hdu=hdu, pad_value=pad_value)
             parallel_hdu = make_square(parallel_hdu, pad_value=pad_value)
         return hdu, parallel_hdu
     else:
-        hdu = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, pad=pad)
-        hdu = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, pad=pad)
-        if centre:
-            hdu = centre_data(hdu=hdu, parallel_hdu=parallel_hdu, frame=centre_frame, pad_value=pad_value)
+        hdu, centre = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
+                                     centre=np.array(centre), centre_frame=centre_frame)
+        hdu, centre = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
+                                        centre=np.array(centre), centre_frame=centre_frame)
+        if np.any(centre):
+            plt.figure()
+            plt.imshow(hdu.data)
+            hdu = centre_data(hdu=hdu, centre=centre, frame=centre_frame, parallel_hdu=parallel_hdu, pad_value=pad_value)
+            plt.figure()
+            plt.imshow(hdu.data)
         if square:
             hdu = make_square(hdu=hdu, pad_value=pad_value)
         return hdu
 
+data = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/moment0.fits')[0]
+data2 = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/moment0_no_pb_corr.fits')[0]
+compare = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/cutout_g.fits')[0]
+
+trimmed = trim_image(data, centre=(128, 129), centre_frame='image')
+trimmed2 = trim_image(data, centre=(data.header['OBSRA'], data.header['OBSDEC']), centre_frame='sky')
