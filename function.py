@@ -6,6 +6,12 @@ from astropy.io import fits
 
 
 def make_square(hdu, pad_value=0):
+    """
+    Make the image square by padding it.
+    :param hdu (HDU): HDU containing the image and corresponding header.
+    :param pad_value (int, float, or nan): Value with which to pad the sides. Default = 0.
+    :return: HDU containing the square image and corresponding header.
+    """
 
     hdu_square = hdu.copy()
 
@@ -25,6 +31,22 @@ def make_square(hdu, pad_value=0):
 
 
 def cut_empty_rows(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky'):
+    """
+    Trim away empty rows.
+    :param hdu (HDU): HDU containing the image to be trimmed and its corresponding header.
+    :param parallel_hdu (HDU): Additional HDU containing an image + header to be trimmed in the same way as "hdu" (image
+    has to be the same size). Default = None.
+    :param empty_value (int, float, or nan): Values indicating "empty" pixels in the image. Default = 0.
+    :param pad (int or float): Padding to be left on each side after trimming the image, in units pixel (for example, a
+    value of 2 will leave 2 empty rows/columns on each side of the image, if present before trimming). Default = 0.
+    :param centre (tuple, list, or ndarray of ints or floats): Pixel in the original image (x, y) or sky coordinates
+    (RA, Dec) on which to recentre. If a pixel is given, "frame" should be set to "image". If sky coordinates are given,
+    "frame" should be set to "sky" (see below). Default = None.
+    :param centre_frame (str): Reference frame in which the desired central pixel is given. Has to be either "sky" or
+    "image". If a desired central pixel is provided and the frame is "image", the function will track the pixel.
+    Default = "sky".
+    :return: HDU containing the image with its empty rows trimmed and corresponding header.
+    """
 
     hdu_trimmed = hdu.copy()
     if parallel_hdu:
@@ -71,6 +93,22 @@ def cut_empty_rows(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, ce
 
 
 def cut_empty_columns(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky'):
+    """
+    Trim away empty columns.
+    :param hdu (HDU): HDU containing the image to be trimmed and its corresponding header.
+    :param parallel_hdu (HDU): Additional HDU containing an image + header to be trimmed in the same way as "hdu" (image
+    has to be the same size). Default = None.
+    :param empty_value (int, float, or nan): Values indicating "empty" pixels in the image. Default = 0.
+    :param pad (int or float): Padding to be left on each side after trimming the image, in units pixel (for example, a
+    value of 2 will leave 2 empty rows/columns on each side of the image, if present before trimming). Default = 0.
+    :param centre (tuple, list, or ndarray of ints or floats): Pixel in the original image (x, y) or sky coordinates
+    (RA, Dec) on which to recentre. If a pixel is given, "frame" should be set to "image". If sky coordinates are given,
+    "frame" should be set to "sky" (see below). Default = None.
+    :param centre_frame (str): Reference frame in which the desired central pixel is given. Has to be either "sky" or
+    "image". If a desired central pixel is provided and the frame is "image", the function will track the pixel.
+    Default = "sky".
+    :return: HDU containing the image with its empty columns trimmed and corresponding header.
+    """
 
     hdu_trimmed = hdu.copy()
     if parallel_hdu:
@@ -117,6 +155,18 @@ def cut_empty_columns(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None,
 
 
 def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
+    """
+    Recenter the trimmed image on a given pixel or set of sky coordinates.
+    :param hdu (HDU): HDU containing the image to be recentred and its corresponding header.
+    :param centre (tuple, list, or ndarray of ints or floats): Pixel in the original image (x, y) or sky coordinates
+    (RA, Dec) on which to recentre. If a pixel is given, "frame" should be set to "image". If sky coordinates are given,
+    "frame" should be set to "sky" (see below).
+    :param frame (str): Frame in which the centre is provided, either "image" or "sky". Default = "sky".
+    :param parallel_hdu (HDU): Additional HDU containing an image + header to be centred in the same way as "hdu" (image has
+    to be the same size). Default = None.
+    :param pad_value (int, float, or nan): Value with which to pad the sides. Default = 0.
+    :return: HDU containing the re-centred image and corresponding header.
+    """
     
     hdu_centred = hdu.copy()
     if parallel_hdu:
@@ -194,9 +244,35 @@ def centre_data(hdu, centre, frame='sky', parallel_hdu=None, pad_value=0):
 
 
 def trim_image(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre_frame='sky', square=False, pad_value=0):
+    """
+    Automatically trim empty (as defined by the user) rows and columns in the image provided, adjusting the header
+    accordingly, to give you the optimal "zoomed-in" version of your image. Has the option to recenter the image on a
+    certain pixel or set of sky coordinates and/or make the image square by padding it with a chosen value. It also has
+    the option to provide a second image to be trimmed, centred, and squared according to the first image, provided that
+    it has the same dimensions.
+    :param hdu (HDU): HDU containing the image to be trimmed and its corresponding header.
+    :param parallel_hdu (HDU): Additional HDU containing an image + header to be centred in the same way as "hdu" (image
+    has to be the same size). Default = None.
+    :param empty_value (int, float, or nan): Values indicating "empty" pixels in the image. Default = 0.
+    :param pad (int or float): Padding to be left on each side after trimming the image, in units pixel (for example, a
+    value of 2 will leave 2 empty rows/columns on each side of the image, if present before trimming). Default = 0.
+    :param centre (tuple, list, or ndarray of ints or floats): Pixel in the original image (x, y) or sky coordinates
+    (RA, Dec) on which to recentre. If a pixel is given, "frame" should be set to "image". If sky coordinates are given,
+    "frame" should be set to "sky" (see below). Default = None.
+    :param frame (str): Frame in which the centre is provided, either "image" or "sky". Default = "sky".
+    :param square (bool): Whether to make the image(s) square by adding padding. Default = False.
+    :param pad_value (int, float, or nan): value with which to pad the image in case it is recentred and/or squared.
+    :return: Either a HDU containing the trimmed image and updated header, or a tuple of HDUs if "parallel_hdu" is
+    provided.
+    """
 
-    from matplotlib import pyplot as plt
-    import aplpy as apl
+    if np.any(centre):
+        if not len(centre) == 2:
+            raise TypeError('For "centre", please provide a tuple, list, or ndarray of length 2 containing either pixel coordinates'
+                            '(x, y) or sky coordinates (RA, Dec), and adjust the keyword "frame" accordingly.')
+    if not centre_frame == 'sky':
+        if not centre_frame == 'image':
+            raise TypeError('Please set "frame" to either "sky" or "image".')
 
     if parallel_hdu:
         hdu, parallel_hdu, centre = cut_empty_rows(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
@@ -215,11 +291,7 @@ def trim_image(hdu, parallel_hdu=None, empty_value=0, pad=0, centre=None, centre
         hdu, centre = cut_empty_columns(hdu, parallel_hdu=parallel_hdu, empty_value=empty_value, pad=pad,
                                         centre=np.array(centre), centre_frame=centre_frame)
         if np.any(centre):
-            plt.figure()
-            plt.imshow(hdu.data)
             hdu = centre_data(hdu=hdu, centre=centre, frame=centre_frame, parallel_hdu=parallel_hdu, pad_value=pad_value)
-            plt.figure()
-            plt.imshow(hdu.data)
         if square:
             hdu = make_square(hdu=hdu, pad_value=pad_value)
         return hdu
@@ -228,5 +300,8 @@ data = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/moment0.fits'
 data2 = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/moment0_no_pb_corr.fits')[0]
 compare = fits.open('/home/nikki/Documents/Galaxies/Detections/FCC207/cutout_g.fits')[0]
 
-trimmed = trim_image(data, centre=(128, 129), centre_frame='image')
-trimmed2 = trim_image(data, centre=(data.header['OBSRA'], data.header['OBSDEC']), centre_frame='sky')
+trimmed, trimmed2 = trim_image(data, parallel_hdu=data2, square=True, pad_value=np.nan, centre=[0, 0])
+
+from matplotlib import pyplot as plt
+
+plt.imshow(trimmed2.data)
